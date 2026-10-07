@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Study Planner</title>
+<style>
+/* ===== Theme variables (dark mode overrides below) ===== */
+:root{--bg:#f3f5fb;--card:#fff;--text:#1d2433;--muted:#6b7488;--primary:#4f46e5;--border:#e3e7f0;
+--shadow:0 4px 16px rgba(30,40,80,.08);--red:#ef4444;--yellow:#f59e0b;--green:#22c55e}
+[data-theme=dark]{--bg:#0f1420;--card:#1a2133;--text:#e8ecf6;--muted:#97a1b8;--border:#2b3550;--shadow:0 4px 16px rgba(0,0,0,.4)}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+h2,h3{margin:0 0 10px}
+
+/* ===== Sidebar ===== */
+.sidebar{width:230px;background:var(--card);border-right:1px solid var(--border);padding:20px 14px;position:fixed;inset:0 auto 0 0;z-index:10;transition:transform .25s}
+.logo{font-size:1.2rem;margin:0 0 20px 8px}
+.nav{display:block;width:100%;text-align:left;background:none;border:0;color:var(--text);padding:11px 12px;border-radius:12px;font-size:.95rem;cursor:pointer;margin-bottom:4px}
+.nav:hover{background:var(--bg)}
+.nav.active{background:var(--primary);color:#fff}
+
+/* ===== Layout ===== */
+.main{margin-left:230px;flex:1;padding:20px;max-width:1100px;width:100%}
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.topbar h2{flex:1;margin:0}
+.icon-btn{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:1rem;color:var(--text)}
+.menu{display:none}
+.page{display:none}.page.active{display:block}
+.grid{display:grid;gap:14px;margin-bottom:14px}
+.stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.two{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+
+/* ===== Cards & forms ===== */
+.card{background:var(--card);border-radius:16px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;border:1px solid var(--border)}
+.grid .card{margin-bottom:0}
+.stat span{color:var(--muted);font-size:.85rem}
+.stat b{display:block;font-size:2rem;margin-top:4px}
+.muted{color:var(--muted);font-size:.9rem}
+.form{display:grid;gap:10px}
+.form h3{margin:0}
+input,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.95rem}
+label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.filters input,.filters select{flex:1;min-width:150px}
+.btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:10px 18px;cursor:pointer;font-size:.95rem}
+.btn:hover{opacity:.9}
+.btn.ghost{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn.danger{background:var(--red)}
+.btn.sm{padding:5px 10px;font-size:.8rem}
+.result{font-weight:600;margin:0;line-height:1.5}
+
+/* ===== Progress bars & chart ===== */
+.bar{height:14px;background:var(--bg);border-radius:99px;overflow:hidden;border:1px solid var(--border)}
+.bar div{height:100%;width:0;background:linear-gradient(90deg,var(--primary),#818cf8);transition:width .4s}
+.chart{display:flex;align-items:flex-end;gap:10px;height:180px;padding-top:10px}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:.75rem;color:var(--muted)}
+.col i{display:block;width:100%;max-width:44px;background:var(--primary);border-radius:8px 8px 0 0;min-height:2px;transition:height .4s}
+
+/* ===== Task / exam / reminder items ===== */
+.task{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-left:5px solid var(--green);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.task.High{border-left-color:var(--red)}.task.Medium{border-left-color:var(--yellow)}
+.task.done .t-name{text-decoration:line-through;opacity:.55}
+.t-name{font-weight:600}
+.meta{color:var(--muted);font-size:.82rem;margin:4px 0}
+.meta a{color:var(--primary);margin-right:10px}
+.actions{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap}
+.pill{display:inline-block;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:3px 12px;font-size:.8rem}
+.exam b{font-size:1.6rem;display:block;margin:6px 0}
+.exam.urgent{border-color:var(--red);background:rgba(239,68,68,.08)}
+.exam.urgent b{color:var(--red)}
+.remind{padding:10px 14px;border-radius:12px;background:rgba(245,158,11,.12);border-left:4px solid var(--yellow);margin-bottom:8px}
+.remind.late{background:rgba(239,68,68,.12);border-color:var(--red)}
+.plan-day{padding:8px 0;border-bottom:1px dashed var(--border)}
+
+/* ===== Pomodoro ===== */
+.center{text-align:center}.center-row{justify-content:center}
+.timer{font-size:4.5rem;font-weight:700;margin:14px 0;font-variant-numeric:tabular-nums}
+
+/* ===== Mobile ===== */
+@media(max-width:800px){
+  .sidebar{transform:translateX(-100%)}.sidebar.open{transform:none}
+  .main{margin-left:0;padding:14px}.menu{display:block}
+  .timer{font-size:3.4rem}
+}
+
+</style>
+</head>
+<body>
+<!-- ===== Sidebar navigation ===== -->
+<aside class="sidebar" id="sidebar">
+  <h1 class="logo">📚 Smart Study</h1>
+  <nav>
+    <button class="nav active" data-page="dashboard">🏠 Dashboard</button>
+    <button class="nav" data-page="tasks">✅ Tasks</button>
+    <button class="nav" data-page="exams">🎓 Exams</button>
+    <button class="nav" data-page="pomodoro">⏱️ Pomodoro</button>
+    <button class="nav" data-page="progress">📈 Progress</button>
+    <button class="nav" data-page="tools">🧮 Academic Tools</button>
+    <button class="nav" data-page="settings">⚙️ Settings</button>
+  </nav>
+</aside>
+
+<main class="main">
+  <header class="topbar">
+    <button id="menuBtn" class="icon-btn menu">☰</button>
+    <h2 id="pageTitle">Dashboard</h2>
+    <button id="themeBtn" class="icon-btn" title="Toggle theme">🌙</button>
+  </header>
+
+  <!-- ===== Dashboard ===== -->
+  <section class="page active" id="dashboard">
+    <div class="grid stats">
+      <div class="card stat"><span>Total tasks</span><b id="sTotal">0</b></div>
+      <div class="card stat"><span>Completed</span><b id="sDone">0</b></div>
+      <div class="card stat"><span>Pending</span><b id="sPending">0</b></div>
+      <div class="card stat"><span>Due today</span><b id="sToday">0</b></div>
+    </div>
+    <div class="grid two">
+      <div class="card"><h3>Overall progress</h3>
+        <div class="bar"><div id="dashBar"></div></div><p id="dashPct" class="muted"></p></div>
+      <div class="card"><h3>Daily study goal</h3>
+        <div class="bar"><div id="goalBar"></div></div><p id="goalTxt" class="muted"></p></div>
+    </div>
+    <div class="card"><h3>🔔 Smart Reminders</h3><div id="reminders"></div></div>
+  </section>
+
+  <!-- ===== Tasks ===== -->
+  <section class="page" id="tasks">
+    <form id="taskForm" class="card form">
+      <h3 id="taskFormTitle">Add task</h3>
+      <input id="tName" placeholder="Task name" required>
+      <input id="tSubject" placeholder="Subject" required>
+      <label>Deadline<input id="tDate" type="date" required></label>
+      <select id="tDiff"><option>Easy</option><option selected>Medium</option><option>Hard</option></select>
+      <input id="tTime" type="number" min="5" step="5" placeholder="Estimated time (minutes)" required>
+      <input id="tNotes" type="url" placeholder="Notes / PDF URL (optional)">
+      <input id="tVideo" type="url" placeholder="YouTube URL (optional)">
+      <div class="row"><button class="btn" type="submit" id="taskSubmit">Add task</button>
+        <button class="btn ghost" type="button" id="taskCancel" hidden>Cancel edit</button></div>
+    </form>
+    <div class="card row filters">
+      <input id="fSearch" placeholder="🔍 Search tasks">
+      <select id="fSubject"><option value="">All subjects</option></select>
+      <select id="fDiff"><option value="">All difficulties</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
+    </div>
+    <p class="muted">Sorted by the Smart Priority Algorithm (deadline + difficulty + study time).</p>
+    <div id="taskList"></div>
+  </section>
+
+  <!-- ===== Exams ===== -->
+  <section class="page" id="exams">
+    <form id="examForm" class="card form">
+      <h3>Add exam</h3>
+      <input id="eName" placeholder="Exam name" required>
+      <input id="eSubject" placeholder="Subject" required>
+      <input id="eDate" type="date" required>
+      <button class="btn" type="submit">Add exam</button>
+    </form>
+    <div id="examList" class="grid two"></div>
+    <div class="card form">
+      <h3>Auto Study Planner</h3>
+      <select id="pExam"></select>
+      <input id="pHours" type="number" min="0.5" step="0.5" value="2" placeholder="Study hours per day">
+      <button class="btn" id="planBtn">Generate schedule</button>
+      <div id="planOut"></div>
+    </div>
+  </section>
+
+  <!-- ===== Pomodoro ===== -->
+  <section class="page" id="pomodoro">
+    <div class="card center">
+      <div id="pomoMode" class="pill">Focus</div>
+      <div id="pomoTime" class="timer">25:00</div>
+      <div class="row center-row">
+        <button class="btn" id="pStart">Start</button>
+        <button class="btn ghost" id="pPause">Pause</button>
+        <button class="btn ghost" id="pReset">Reset</button>
+      </div>
+      <p class="muted" id="pomoInfo"></p>
+    </div>
+  </section>
+
+  <!-- ===== Progress ===== -->
+  <section class="page" id="progress">
+    <div class="grid stats">
+      <div class="card stat"><span>Completed</span><b id="pDone">0</b></div>
+      <div class="card stat"><span>Pending</span><b id="pPend">0</b></div>
+      <div class="card stat"><span>Study hours (total)</span><b id="pHrs">0</b></div>
+      <div class="card stat"><span>Today's goal</span><b id="pGoal">0%</b></div>
+    </div>
+    <div class="card"><h3>Weekly study (hours, last 7 days)</h3><div id="weekChart" class="chart"></div></div>
+  </section>
+
+  <!-- ===== Academic tools ===== -->
+  <section class="page" id="tools">
+    <div class="grid two">
+      <form id="cgpaForm" class="card form">
+        <h3>CGPA Calculator</h3>
+        <input id="gpas" placeholder="Semester GPAs, e.g. 8.2, 7.9, 8.5" required>
+        <button class="btn" type="submit">Calculate</button>
+        <p id="cgpaOut" class="result"></p>
+      </form>
+      <form id="attForm" class="card form">
+        <h3>Attendance Calculator</h3>
+        <input id="aTotal" type="number" min="1" placeholder="Total classes" required>
+        <input id="aAtt" type="number" min="0" placeholder="Attended classes" required>
+        <button class="btn" type="submit">Calculate</button>
+        <p id="attOut" class="result"></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== Settings ===== -->
+  <section class="page" id="settings">
+    <div class="card form">
+      <h3>Preferences</h3>
+      <label>Daily study goal (hours)<input id="goalInput" type="number" min="0.5" step="0.5"></label>
+      <button class="btn ghost" id="themeBtn2">Toggle light / dark mode</button>
+      <button class="btn ghost" id="notifBtn">Enable browser notifications</button>
+      <button class="btn danger" id="resetBtn">Delete all data</button>
+    </div>
+  </section>
+</main>
+<script>
+/* ==========================================================
+   Smart Study Planner - Vanilla JS + LocalStorage
+   ========================================================== */
+
+/* ---------- Helpers & state ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const KEY = 'smartStudyPlanner';
+
+// App state; merged with whatever was saved before
+let S = Object.assign({ tasks: [], exams: [], log: {}, goal: 2, theme: 'light' },
+  JSON.parse(localStorage.getItem(KEY) || '{}'));
+const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => iso(new Date());
+// Whole days from today until a YYYY-MM-DD date (negative = overdue)
+const daysLeft = ds => Math.round((new Date(ds + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5);
+// Escape user text before inserting into HTML (prevents broken markup / XSS)
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = u => /^https?:\/\//i.test(u) ? u : '';
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+/* ---------- Navigation ---------- */
+function showPage(id) {
+  $$('.page').forEach(p => p.classList.toggle('active', p.id === id));
+  $$('.nav').forEach(b => b.classList.toggle('active', b.dataset.page === id));
+  $('#pageTitle').textContent = $(`.nav[data-page=${id}]`).textContent.replace(/^\S+\s/, '');
+  $('#sidebar').classList.remove('open');
+  render();
+}
+$$('.nav').forEach(b => b.onclick = () => showPage(b.dataset.page));
+$('#menuBtn').onclick = () => $('#sidebar').classList.toggle('open');
+
+/* ---------- Theme ---------- */
+function applyTheme() {
+  document.documentElement.dataset.theme = S.theme;
+  $('#themeBtn').textContent = S.theme === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() { S.theme = S.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); }
+$('#themeBtn').onclick = $('#themeBtn2').onclick = toggleTheme;
+
+/* ---------- Smart Priority Algorithm ----------
+   Score = deadline proximity (0-40) + difficulty (5/15/25) + study time (0-20).
+   >= 50 High, >= 30 Medium, otherwise Low. */
+function priority(t) {
+  const d = daysLeft(t.date);
+  const dl = d <= 1 ? 40 : d <= 3 ? 30 : d <= 7 ? 20 : d <= 14 ? 10 : 0;
+  const df = { Easy: 5, Medium: 15, Hard: 25 }[t.diff];
+  const tm = Math.min(t.time / 10, 20);
+  const score = dl + df + tm;
+  return { score, label: score >= 50 ? 'High' : score >= 30 ? 'Medium' : 'Low' };
+}
+const ICON = { High: '🔴', Medium: '🟡', Low: '🟢' };
+
+/* ---------- Tasks: add / edit ---------- */
+let editId = null;
+$('#taskForm').onsubmit = e => {
+  e.preventDefault();
+  const t = {
+    id: editId || uid(), name: $('#tName').value.trim(), subject: $('#tSubject').value.trim(),
+    date: $('#tDate').value, diff: $('#tDiff').value, time: +$('#tTime').value,
+    notes: $('#tNotes').value.trim(), video: $('#tVideo').value.trim(), done: false
+  };
+  if (editId) {
+    const old = S.tasks.find(x => x.id === editId);
+    t.done = old.done;
+    S.tasks[S.tasks.indexOf(old)] = t;
+  } else S.tasks.push(t);
+  save(); cancelEdit(); render();
+};
+function cancelEdit() {
+  editId = null; $('#taskForm').reset(); $('#tDiff').value = 'Medium';
+  $('#taskFormTitle').textContent = 'Add task'; $('#taskSubmit').textContent = 'Add task';
+  $('#taskCancel').hidden = true;
+}
+$('#taskCancel').onclick = cancelEdit;
+
+// Edit / delete / complete via event delegation on the list
+$('#taskList').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const t = S.tasks.find(x => x.id === b.dataset.id); if (!t) return;
+  if (b.dataset.act === 'done') t.done = !t.done;
+  if (b.dataset.act === 'del' && confirm('Delete this task?')) S.tasks = S.tasks.filter(x => x !== t);
+  if (b.dataset.act === 'edit') {
+    editId = t.id;
+    $('#tName').value = t.name; $('#tSubject').value = t.subject; $('#tDate').value = t.date;
+    $('#tDiff').value = t.diff; $('#tTime').value = t.time; $('#tNotes').value = t.notes; $('#tVideo').value = t.video;
+    $('#taskFormTitle').textContent = 'Edit task'; $('#taskSubmit').textContent = 'Save changes';
+    $('#taskCancel').hidden = false; window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  save(); render();
+};
+['#fSearch', '#fSubject', '#fDiff'].forEach(s => $(s).oninput = renderTasks);
+
+function renderTasks() {
+  // Refresh subject filter options, keeping the current selection
+  const cur = $('#fSubject').value;
+  const subjects = [...new Set(S.tasks.map(t => t.subject))].sort();
+  $('#fSubject').innerHTML = '<option value="">All subjects</option>' +
+    subjects.map(s => `<option ${s === cur ? 'selected' : ''}>${esc(s)}</option>`).join('');
+
+  const q = $('#fSearch').value.toLowerCase(), fs = $('#fSubject').value, fd = $('#fDiff').value;
+  const list = S.tasks
+    .filter(t => (!q || (t.name + t.subject).toLowerCase().includes(q)) && (!fs || t.subject === fs) && (!fd || t.diff === fd))
+    .sort((a, b) => a.done - b.done || priority(b).score - priority(a).score); // pending first, high priority first
+
+  $('#taskList').innerHTML = list.map(t => {
+    const p = priority(t).label, d = daysLeft(t.date);
+    const due = d < 0 ? `Overdue by ${-d}d` : d === 0 ? 'Due today' : `${d} day(s) left`;
+    const n = safeUrl(t.notes), v = safeUrl(t.video);
+    return `<div class="task ${t.done ? 'done' : p}">
+      <div><div class="t-name">${ICON[p]} ${esc(t.name)}</div>
+        <div class="meta">${esc(t.subject)} • ${t.diff} • ${t.time} min • ${t.date} (${due}) • Priority: ${p}</div>
+        <div class="meta">${n ? `<a href="${esc(n)}" target="_blank" rel="noopener">📄 Notes</a>` : ''}${v ? `<a href="${esc(v)}" target="_blank" rel="noopener">▶️ YouTube</a>` : ''}</div></div>
+      <div class="actions">
+        <button class="btn sm" data-act="done" data-id="${t.id}">${t.done ? 'Undo' : 'Complete'}</button>
+        <button class="btn sm ghost" data-act="edit" data-id="${t.id}">Edit</button>
+        <button class="btn sm danger" data-act="del" data-id="${t.id}">Delete</button></div></div>`;
+  }).join('') || '<p class="muted">No tasks found.</p>';
+}
+
+/* ---------- Exams ---------- */
+$('#examForm').onsubmit = e => {
+  e.preventDefault();
+  S.exams.push({ id: uid(), name: $('#eName').value.trim(), subject: $('#eSubject').value.trim(), date: $('#eDate').value });
+  save(); e.target.reset(); render();
+};
+$('#examList').onclick = e => {
+  const b = e.target.closest('button');
+  if (b && confirm('Delete this exam?')) { S.exams = S.exams.filter(x => x.id !== b.dataset.id); save(); render(); }
+};
+function renderExams() {
+  const ex = [...S.exams].sort((a, b) => a.date.localeCompare(b.date));
+  $('#examList').innerHTML = ex.map(x => {
+    const d = daysLeft(x.date);
+    const txt = d < 0 ? 'Exam finished' : d === 0 ? 'Today!' : `${d} day${d === 1 ? '' : 's'} remaining`;
+    const urgent = d >= 0 && d <= 7; // urgent when within a week
+    return `<div class="card exam ${urgent ? 'urgent' : ''}"><h3>${esc(x.name)}</h3>
+      <span class="muted">${esc(x.subject)} • ${x.date}</span><b>${urgent ? '🚨 ' : ''}${txt}</b>
+      <button class="btn sm danger" data-id="${x.id}">Delete</button></div>`;
+  }).join('') || '<p class="muted">No exams added yet.</p>';
+  $('#pExam').innerHTML = ex.filter(x => daysLeft(x.date) >= 0)
+    .map(x => `<option value="${x.id}">${esc(x.name)} (${esc(x.subject)})</option>`).join('') || '<option value="">Add an upcoming exam first</option>';
+}
+
+/* ---------- Auto Study Planner ----------
+   Spreads the pending tasks of the exam's subject over the days left,
+   fitting the available hours per day; last day is kept for revision. */
+$('#planBtn').onclick = () => {
+  const out = $('#planOut'), ex = S.exams.find(x => x.id === $('#pExam').value);
+  const hrs = +$('#pHours').value;
+  if (!ex || !hrs) { out.innerHTML = '<p class="muted">Choose an exam and enter study hours.</p>'; return; }
+  const days = daysLeft(ex.date);
+  const topics = S.tasks.filter(t => !t.done && t.subject.toLowerCase() === ex.subject.toLowerCase());
+  if (!topics.length) { out.innerHTML = `<p class="muted">No pending tasks for "${esc(ex.subject)}". Add tasks with this subject first.</p>`; return; }
+  const n = Math.min(days, 14) || 1; // plan up to 14 days
+  let html = `<p class="muted">${days} day(s) left • ${topics.length} topic(s) • ${hrs}h/day</p>`;
+  for (let i = 0; i < n; i++) {
+    const date = new Date(); date.setDate(date.getDate() + i);
+    const last = i === n - 1 && n > 1;
+    // Rotate through topics; two topics per day when there are more topics than days
+    const per = Math.ceil(topics.length / n);
+    const todo = last ? ['Full revision + practice questions'] :
+      Array.from({ length: per }, (_, k) => topics[(i * per + k) % topics.length].name);
+    html += `<div class="plan-day"><b>Day ${i + 1}</b> (${iso(date)}): ${todo.map(esc).join(', ')} — ${hrs}h</div>`;
+  }
+  out.innerHTML = html;
+};
+
+/* ---------- Pomodoro ---------- */
+const FOCUS = 25 * 60, BREAK = 5 * 60;
+let mode = 'focus', left = FOCUS, timer = null;
+function drawTimer() {
+  const t = `${pad(Math.floor(left / 60))}:${pad(left % 60)}`;
+  $('#pomoTime').textContent = t;
+  $('#pomoMode').textContent = mode === 'focus' ? 'Focus' : 'Break';
+  document.title = timer ? `${t} • Smart Study Planner` : 'Smart Study Planner';
+  const m = S.log[today()] || 0;
+  $('#pomoInfo').textContent = `Focus time today: ${m} min`;
+}
+function tick() {
+  if (--left > 0) return drawTimer();
+  clearInterval(timer); timer = null;
+  if (mode === 'focus') { S.log[today()] = (S.log[today()] || 0) + 25; save(); render(); } // update progress
+  notify(mode === 'focus' ? 'Focus session done! Take a 5 min break.' : 'Break over. Ready to focus?');
+  mode = mode === 'focus' ? 'break' : 'focus';
+  left = mode === 'focus' ? FOCUS : BREAK;
+  drawTimer();
+}
+$('#pStart').onclick = () => { if (!timer) timer = setInterval(tick, 1000); };
+$('#pPause').onclick = () => { clearInterval(timer); timer = null; drawTimer(); };
+$('#pReset').onclick = () => { clearInterval(timer); timer = null; mode = 'focus'; left = FOCUS; drawTimer(); };
+
+/* ---------- Reminders (browser notification, in-app cards as fallback) ---------- */
+const notified = new Set();
+function notify(msg) {
+  if ('Notification' in window && Notification.permission === 'granted') new Notification('Smart Study Planner', { body: msg });
+}
+function renderReminders() {
+  const due = S.tasks.filter(t => !t.done && daysLeft(t.date) <= 2).sort((a, b) => a.date.localeCompare(b.date));
+  $('#reminders').innerHTML = due.map(t => {
+    const d = daysLeft(t.date);
+    const m = d < 0 ? `"${t.name}" is overdue!` : d === 0 ? `"${t.name}" is due today.` : `"${t.name}" is due in ${d} day(s).`;
+    if (!notified.has(t.id)) { notified.add(t.id); notify(m); }
+    return `<div class="remind ${d < 0 ? 'late' : ''}">⏰ ${esc(m)}</div>`;
+  }).join('') || '<p class="muted">No urgent deadlines. 🎉</p>';
+}
+$('#notifBtn').onclick = () => {
+  if (!('Notification' in window)) return alert('Notifications are not supported here. In-app reminders will be used.');
+  Notification.requestPermission().then(p => alert(p === 'granted' ? 'Notifications enabled!' : 'Permission not granted. In-app reminders still work.'));
+};
+
+/* ---------- Dashboard & Progress ---------- */
+function renderStats() {
+  const total = S.tasks.length, done = S.tasks.filter(t => t.done).length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const mins = S.log[today()] || 0, goalPct = Math.min(100, Math.round(mins / (S.goal * 60) * 100));
+  const allMins = Object.values(S.log).reduce((a, b) => a + b, 0);
+  $('#sTotal').textContent = total; $('#sDone').textContent = done; $('#sPending').textContent = total - done;
+  $('#sToday').textContent = S.tasks.filter(t => !t.done && t.date === today()).length;
+  $('#dashBar').style.width = pct + '%'; $('#dashPct').textContent = `${pct}% of tasks completed`;
+  $('#goalBar').style.width = goalPct + '%'; $('#goalTxt').textContent = `${mins} / ${S.goal * 60} min studied today (${goalPct}%)`;
+  $('#pDone').textContent = done; $('#pPend').textContent = total - done;
+  $('#pHrs').textContent = (allMins / 60).toFixed(1) + 'h'; $('#pGoal').textContent = goalPct + '%';
+
+  // Weekly bar chart (last 7 days, built with plain divs)
+  let cols = '', max = Math.max(60, ...Object.values(S.log));
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const m = S.log[iso(d)] || 0;
+    cols += `<div class="col">${(m / 60).toFixed(1)}<i style="height:${m / max * 130}px"></i>${d.toLocaleDateString('en', { weekday: 'short' })}</div>`;
+  }
+  $('#weekChart').innerHTML = cols;
+}
+
+/* ---------- Academic tools ---------- */
+$('#cgpaForm').onsubmit = e => {
+  e.preventDefault();
+  const v = $('#gpas').value.split(/[,\s]+/).filter(Boolean).map(Number);
+  const out = $('#cgpaOut');
+  if (!v.length || v.some(x => isNaN(x) || x < 0 || x > 10)) return out.textContent = 'Enter valid GPAs between 0 and 10.';
+  out.textContent = `CGPA: ${(v.reduce((a, b) => a + b) / v.length).toFixed(2)} (from ${v.length} semester${v.length > 1 ? 's' : ''})`;
+};
+$('#attForm').onsubmit = e => {
+  e.preventDefault();
+  const t = +$('#aTotal').value, a = +$('#aAtt').value, out = $('#attOut');
+  if (a > t) return out.textContent = 'Attended classes cannot exceed total classes.';
+  const pct = a / t * 100;
+  let msg = `Attendance: ${pct.toFixed(2)}%`;
+  if (pct >= 75) msg += `\n✅ Above 75%. You can miss up to ${Math.floor((4 * a - 3 * t) / 3)} more class(es) and stay at 75%.`;
+  else msg += `\n⚠️ Below 75%. Attend the next ${Math.ceil(3 * t - 4 * a)} class(es) in a row to reach 75%.`; // from (a+x)/(t+x) >= 0.75
+  out.style.whiteSpace = 'pre-line'; out.textContent = msg;
+};
+
+/* ---------- Settings ---------- */
+$('#goalInput').onchange = e => { S.goal = Math.max(0.5, +e.target.value || 2); save(); render(); };
+$('#resetBtn').onclick = () => {
+  if (confirm('Delete ALL tasks, exams and study history?')) { localStorage.removeItem(KEY); location.reload(); }
+};
+
+/* ---------- Render everything & start ---------- */
+function render() { renderStats(); renderTasks(); renderExams(); renderReminders(); drawTimer(); }
+$('#goalInput').value = S.goal;
+applyTheme(); render();
+
+</script>
+</body>
+</html>
